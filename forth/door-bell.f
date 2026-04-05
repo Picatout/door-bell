@@ -66,6 +66,17 @@ FORGET ODE-JOIE
     0 $E PLAY_WAV
 ;
 
+\ UART registre d'état 
+$5230 CONST USART1_SR
+
+\ registre de configuration
+\ des interruptions externes
+$50A5 CONST EXTI_CONF1 \ activation de l'interruption
+$50A0 CONST EXTI_CR1 \  configuration type de transition 
+$50A3 CONST EXTI_CR3 
+$50A4 CONST EXTI_SR2 \ indicateurs d'interruptions
+6 CONST EXTIB \ numéro du vecteur d'interruption 
+
 \ gpio port A 
 $5000 CONST PA_ODR 
 $5001 CONST PA_IDR 
@@ -128,16 +139,54 @@ $5013 CONST PD_CR2
 ; 
 
 
+: WFI 
+  [ $8F C, ]
+; 
+
+: HALT 
+    [ $8E C, ]
+; 
+
+\ attend que 
+\ le bouton sonnette 
+\ soit relaché 
+: DEBOUNCE 
+    0 
+    BEGIN
+        10000 FOR NEXT \ delais 
+        PB_IDR C@
+        2 AND 
+        IF 1+ ELSE 1- THEN
+        20 > 
+    UNTIL  
+; 
+
+EXTIB I:
+    DEBOUNCE
+    0 EXTI_SR2 SETBIT \ rst intr flag
+I; 
 
 : DOOR-BELL
+    0 EXTI_CONF1 SETBIT \ active intr sur PB[0..3] 
+    3 EXTI_CR1 SETBIT \ transition descendante sur PB1  
+\    1 EXTI_CR3 SETBIT 
+    1 PB_CR1 SETBIT \ pullup sur PB1 
+    1 PB_CR2 SETBIT \ active intr sur PB1
     RING_TONES \ build ring tones array 
-    CR ." DOOR-BELL AUTO-RUNNING" CR 
+    CR ." DOOR-BELL RUNNING, KEY TO ABORT (5 SEC.)" CR 
+    TMR-RST  
     BEGIN 
-        BEGIN 
-            KEY? IF KEY ABORT THEN 
-            PB_IDR C@ 
-            2 AND 
-        0= UNTIL 
+        KEY? IF 
+                KEY ABORT" aborted" 
+            THEN 
+        TIMER 5000 > 
+    UNTIL 
+    ." TOO LATE" 
+    BEGIN USART1_SR C@ $40 AND  UNTIL \ test TC bit  
+    TIM4_IER_UIE TIM4_IER RSTBIT \ désactive timer4 
+    5 CLK_PCKENR1 RSTBIT \ désactive le UART  
+    BEGIN 
+        HALT  
         PA_IDR C@ 
         2* $F8 XOR \ bits 3...7 inversés  
         $F8 AND \ garde les bits 3...7  
@@ -154,6 +203,8 @@ $5013 CONST PD_CR2
         TUNES A@ EXECUTE  
     AGAIN 
 ; 
+
+
 
 
 
