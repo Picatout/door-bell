@@ -1,0 +1,391 @@
+\ *****************************************
+\ programmeur pour les mémoire FLASH SPI 
+\ W25Q80DV 
+\ ****************************************
+
+\ ****************************
+\  DÉPENDANCES
+\
+\    forth/exist.f 
+\ ****************************
+
+DECIMAL 
+FORGET BUFFER 
+
+\ registre 1 d'activation périphérique 
+$50C3 CONST CLK_PCKENR1
+4 CONST CLK_PCKENR1_SPI1 \ SPI bit gating bit 
+
+
+\ sortie chip select sur PB0 
+\ pin 13 du stm8l151k6 
+$5005 CONST PB_ODR 
+$5007 CONST PB_DDR 
+$5008 CONST PB_CR1 
+0 CONST PB0 \ W25Q80DV select   
+
+\ regitres du SPI 
+$5200 CONST SPI1_CR1 \ SPI1 control register 
+$5201 CONST SPI1_CR2 
+$5203 CONST SPI1_SR \ SPI1 status register
+$5204 CONST SPI1_DR \ SPI1 data register
+
+\ création d'un tampon de
+\ n octets dans la mémoire RAM  
+: BUFFER ( <name> n --  )
+    VAR 
+    2- ALLOT 
+;
+
+256 BUFFER PROG_BUFF  \ tampon de programmation
+
+\ configuration du 
+\ périphérique SPI 
+\ CLK=8Mhz
+: SPI_CFG ( -- )
+\ PB0 configuré en sortie push pull 
+\ pour contrôler la broche sélect du W25Q80DV
+    PB0 PB_ODR SETBIT \ ~CS  W25Q80DV désactivé quand à 1   
+    PB0 PB_CR1 SETBIT \ PB0 configuration push pull 
+    PB0 PB_DDR SETBIT  \ PB0 mode sortie 
+    5 PB_CR1 SETBIT   \ SPI SCLK en pushpull 
+    6 PB_CR1 SETBIT   \ SPI MOSI en pushpull 
+    7 PB_CR1 SETBIT  \ SPI MISO pullup activé 
+\ utilisation du SPI à sa fréquence maximale de 8Mhz   
+    CLK_PCKENR1_SPI1 CLK_PCKENR1 SETBIT \ activation du signal clock SPI  
+    3 SPI1_CR2 C!  \ NSS contrôlé par logiciel, mode maître   
+    $44 SPI1_CR1 C! \ activation du périphérique en maître      
+; 
+
+\ désactivation du SPI 
+: SPI_OFF ( -- )
+    6 SPI1_CR1 RSTBIT 
+    CLK_PCKENR1_SPI1 CLK_PCKENR1 RSTBIT
+    PB0 PB_DDR RSTBIT \ mode entrée, avec pullup 
+; 
+
+\ attend que la transaction 
+\ SPI soit complétée
+: SPI_WAIT ( -- )
+    BEGIN 
+        SPI1_SR C@ 
+        $80 AND \ test BSY bit  
+        0= 
+    UNTIL \ boucle jusqu'à ce que  BSY=0
+; 
+
+\ Pour éviter d'écraser 
+\ le contenu de  SPI1_DR  
+: WAIT_TXE ( -- )
+    BEGIN 
+        SPI1_SR C@ 
+        2 AND 
+    UNTIL \ loop until TXE=1 
+; 
+
+\ Envoie d'un octet via SPI  
+\ SPI déjà sélectionné 
+: SPI_WR_BYTE ( c -- ) 
+    WAIT_TXE  
+    SPI1_DR C! 
+    SPI_WAIT  
+    SPI1_DR C@ DROP \ jette l'octet reçu    
+; 
+
+\ réception d'un octet du SPI 
+\ SPI déjà sélectionné  
+\ et l'adresse a déjà été envoyée. 
+: SPI_RD_BYTE ( -- c )
+    WAIT_TXE  
+    0 SPI1_DR C! 
+    BEGIN 
+        SPI1_SR C@ 
+        1 AND  \ test RXNE bit 
+    UNTIL \ boucle jusqu'à ce que RXNE=1 
+    SPI1_DR C@ \ -- c 
+;
+
+\ soustraction d'un entier 
+\ simple non signé d'un 
+\ entier double non signé. 
+: UM- ( ud1 u -- ud2 )
+    2 PICK SWAP - 
+    DUP >R 
+    ROT U> IF 1- THEN 
+    R> SWAP
+; 
+
+\ soustraction de 2 entiers 
+\ double 
+: D- ( d1 d2 -- d3 )
+  >R UM- 
+  R> - 
+; 
+
+\ addtion non signée 
+\ retourne un double 
+: UM+ ( u1 u2 -- ud )
+    OVER +
+    DUP >R 
+    U> IF 1 ELSE 0 THEN
+    R> SWAP 
+;
+
+\ addition d'entiers double
+: D+ ( ud1 ud2 -- ud3 )
+    ROT + \ ud1h+ud2h -> ud3h    
+    ROT  ROT UM+ \ ud3h ud1l+ud2l 0|1 
+    ROT + \ ud3l ud3h  
+;
+
+\ alignement de ud1 sur 
+\ le prochain secteur du W25Q80DV 
+\ un secteur est 4096 octets
+: W25Q_SECT_ALGN ( ud1 -- ud2 )
+    $FFF 0 D+ 
+    SWAP $F000 AND 
+    SWAP     
+;
+
+\ additionne 2 entiers  
+\ double et aligne 
+\ sur le secteur suivant 
+: W25Q_NEXT_SECTOR ( ud1 ud2 -- ud3 )
+    D+ 
+    W25Q_SECT_ALGN
+;
+
+\ Ajoute 256 à l'adresse 
+\ pour passer à la page suivante 
+: W25Q_PAG+ ( ud -- ud+256)
+    SWAP 256 UM+ 
+    ROT + 
+;
+
+\ envoie de l'adresse W25Q80DV
+\ W25Q80DV déjà sélectionné  
+: W25Q_ADDR ( ud -- )
+    SPI_WR_BYTE \ adresse bits 16..23  
+    DUP 
+    8 RSHIFT 
+    SPI_WR_BYTE \ adresse bits 8..15
+    SPI_WR_BYTE \ adresse bits 0..7
+; 
+
+\ sélectionne le W25Q
+: W25Q_SELECT ( -- )
+    PB0 PB_ODR RSTBIT 
+; 
+
+\ désélectionne le W25Q
+: W25Q_DESELECT ( -- )
+    SPI_WAIT \ évter la corruption 
+    PB0 PB_ODR SETBIT \ désélection du W25Q 
+; 
+
+\ Envoie de la commande WRITE ENABLE 
+\ to W25Q80DV
+: W25Q_WR_EN ( -- )
+    W25Q_SELECT 
+    6 SPI_WR_BYTE
+    W25Q_DESELECT \ must deselect after this command 
+; 
+
+\ lecture du registre SR1 
+\ du W25Q80DV
+: W25Q_RD_SR1 ( -- c )
+    W25Q_SELECT 
+    5 SPI_WR_BYTE
+    SPI_RD_BYTE
+    W25Q_DESELECT 
+; 
+
+\ attend la fin de l'opération 
+\ de programmation
+: W25Q_WAIT_EOP 
+    BEGIN \ attend la fin de l'opération 
+      W25Q_RD_SR1
+      3 AND \ test bits WEL et BUSY 
+      0= \ attend qu'ils soient à 0.
+    UNTIL   
+; 
+
+\ efface tout le W25Q80DV
+: W25Q_ERASE_CHIP 
+    SPI_CFG 
+    W25Q_WR_EN 
+    W25Q_SELECT 
+    $60 SPI_WR_BYTE 
+    W25Q_DESELECT 
+    W25Q_WAIT_EOP
+    SPI_OFF  
+; 
+
+\ efface un secteur de 4KO dans la mémoire W25Q80DV
+\ ud est l'adresse du sector  
+: W25Q_ERASE_SECTOR ( ud -- )
+    SPI_CFG 
+    W25Q_WR_EN 
+    W25Q_SELECT 
+    $20 SPI_WR_BYTE 
+    W25Q_ADDR
+    W25Q_DESELECT
+    W25Q_WAIT_EOP
+    SPI_OFF   
+; 
+
+\ efface plusieurs secteurs 
+\ consécutifs.
+\ ud -> premier secteur 
+\ count -> nombre de secteurs 
+: W25Q_ERASE_MANY ( ud count -- )
+    >R 
+    BEGIN 
+        R@ WHILE 
+        2DUP W25Q_ERASE_SECTOR 
+        4096 0 D+ \ addr secteur suivant 
+        R> 1- >R 
+    REPEAT 
+    R> DROP 
+; 
+
+\ envoie le tampon vers le SPI 
+\ b -> adresse du tampon  
+\ ud  -> adresse destination dans W25Q80  
+\ u  -> nombre d'octets à envoyer 
+: WRITE_BUFF ( b ud u -- )
+    >R 
+    W25Q_WR_EN \ authorique l'écriture dans W25Q
+    W25Q_SELECT
+    2 SPI_WR_BYTE \ commande de programmation
+    W25Q_ADDR  
+    R> 1- 
+    FOR 
+        DUP C@ 
+        SPI_WR_BYTE
+        1+
+    NEXT
+    DROP
+    W25Q_DESELECT 
+; 
+
+\ Lecture  du W25Q80DV dans un tampon   
+\ b -> adresse du tampon en RAM 
+\ d  -> adresse dans le W25Q80DV 
+\ u  -> nombre d'octets à lire 
+: READ_BUFF ( b ud u -- )
+    >R 
+    W25Q_SELECT 
+    3   SPI_WR_BYTE \ envoie de la commenade lecture du W25Q80DV  
+    W25Q_ADDR
+    R>
+    1-
+    FOR 
+        SPI_RD_BYTE 
+        OVER C! 
+        1+
+    NEXT
+    DROP 
+    W25Q_DESELECT  
+;
+
+\ load a single line 
+\ from terminal 
+\ b buffer 
+\ c1 max count
+\ c2 left  
+: LOAD_LINE ( b c1 -- b++ c2 )
+   CR 63 EMIT \ carriage return '?' EMIT 
+   QUERY 
+   BEGIN  
+      SWAP  \ c1 b 
+      TOKEN NUMBER? WHILE  
+      OVER C! 1+ 
+      SWAP 1-
+      DUP 0< IF ABORT"  too many" THEN   
+   REPEAT
+   DROP SWAP  
+; 
+
+\ load buffer from data 
+\ input on command line
+\ b is buffer address 
+\ c is byte count 
+: LOAD_BUFF ( b c -- ) 
+   BASE @ >R 
+   HEX 
+   BEGIN 
+      LOAD_LINE 
+      DUP
+   WHILE
+   REPEAT 
+   2DROP
+   R> BASE !  
+; 
+
+\ réception d'un fichier
+\ envoyé par le PC 
+\ et enregistré dans 
+\ W25Q80DV
+\ voir le fichier test.hex pour le format 
+\ de fichier à envoyer en utilisant send.sh 
+\
+\ b adresse du tampon  
+\ ud1 adresse dans W25Q80DV, alignée sur page 
+\ ud2 taille du fichier, multiple de 16
+: RX_FILE ( b ud1 ud2 -- )
+    SPI_CFG 
+    BEGIN
+        2DUP OR WHILE \ tantque ud2 > 0  
+        2DUP >R >R   \ sauve taille sur  R:   
+        0= IF DUP 256 U> IF \ si partie basse > 65535 
+              DROP 256  \ remplace la partie basse par 256 
+            THEN 
+        ELSE \ si taille > 65525 remplace partie basse par 256 
+            DROP 256 \ b ud1 u1 
+        THEN
+        DUP >R \ sauvegarde compte sur R: 
+        3 PICK SWAP \ b ud1 b u1 
+        LOAD_BUFF \ -- b ud1 
+        2DUP \ b ud1 ud1 
+        4 PICK \ b ud1 ud1 b 
+        ROT ROT \ b ud1 b ud1 
+        R@ \ b ud1 b ud1 u1 
+        WRITE_BUFF \ écris le tampon dans W25Q80DV 
+        W25Q_PAG+   \ avance l'adresse à la page suivante 
+        R> R> R> ROT \ b ud1 ud2 compte 
+        UM- \ b ud1 ud2-compte 
+    REPEAT 
+    PRESET \ vide la pile 
+    SPI_OFF 
+; 
+
+\ dump une partie du contenu de 
+\ W25Q80DV 
+\ b tampon de lecture 
+\ ud1 adresse de départ 
+\ ud2 compte 
+: W25Q_DUMP ( b ud1 ud2 -- )
+    SPI_CFG
+    BEGIN 
+        2DUP OR WHILE \ tanque ud2 > 0
+        2DUP >R >R \ sauve ud2 sur R: 
+        0= IF DUP 256 U> IF \ si partie basse > 65535 
+              DROP 256  \ remplace la partie basse par 256 
+            THEN 
+        ELSE \ si taille > 65525 remplace partie basse par 256 
+            DROP 256 \ b ud1 256 
+        THEN
+        >R \ sauvegarde compte sur R: 
+        2DUP \ b ud1 ud1 
+        4 PICK \ b ud1 ud1 b 
+        ROT ROT \ b ud1 b ud1 
+        R@ READ_BUFF \ b ud1 b ud1 u1 -- b ud1  
+        2 PICK R@ 1- DUMP
+        W25Q_PAG+ 
+        R> R> R> ROT \ b ud1 ud2 compte 
+        UM- \ b ud1 ud2-compte 
+    REPEAT 
+    PRESET 
+    SPI_OFF 
+; 

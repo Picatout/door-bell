@@ -1,0 +1,159 @@
+\ ****************
+\ **  DOOR-BELL **
+\ ****************
+
+\ avant d'installer ce programme 
+\ sur le stm8l151k6 les programmes 
+\ suivants doivent-être isntallés 
+\ dans l'ordre 
+\    forth/exist.f 
+\    forth/w25q_prog.f
+\    forth/play_wav.f 
+   
+DECIMAL 
+FORGET ODE-JOIE 
+
+\ ODE À LA JOIE, HYMNE DE L'UNION EUROPÉENNE
+: ODE-JOIE 
+    CR ." ODE A LA JOIE"
+    0 0 PLAY_WAV 
+;
+
+\ CODE ENVOYÉ PAR LES EXTRA-TERRESTRE 
+\ DANS LE FILM RENCONTRE DU 3IÈME TYPE 
+: CODE-ET 
+    CR ." CODE RENCONTRE DU 3IEME TYPE"
+    $9000 2 PLAY_WAV  
+;
+
+\ WESTMINSTER TOWER QUATER CHIME 
+: BIG-BEN 
+    CR ." WESTMINSTER CHIME"
+    $6000 4 PLAY_WAV 
+; 
+
+\ THÈME MUSICAL ORIGINAL DU
+\ JEU TETRIS
+: KORO
+    CR ." TETRIS, KOROBEINIKI"
+    $B000 6 PLAY_WAV
+;
+
+\ SON DE GONG 
+\ PROVIENT DE LIBRE OFFICE 
+: GONG 
+    CR ." GONG" 
+    $8000 8 PLAY_WAV 
+;
+
+\ THÈME DU FILM 
+\ LES JEUX INTERDITS
+: J-INTERD
+    CR ." LES JEUX INTERDITS
+    $7000 $B PLAY_WAV
+;
+
+\  KONGAS 
+\ PROVIENT DE LIBRE OFFICE 
+: KONGAS 
+    CR ." KONGAS" 
+    $2000 $D PLAY_WAV
+;
+
+\ TROMPETTES ROMAINES
+: TROMPETTE
+    CR ." TROMPETTES ROMAINES"
+    0 $E PLAY_WAV
+;
+
+\ gpio port A 
+$5000 CONST PA_ODR 
+$5001 CONST PA_IDR 
+$5002 CONST PA_DDR  
+$5003 CONST PA_CR1 
+$5004 CONST PA_CR2 
+
+\ gpio port B 
+$5005 CONST PB_ODR 
+$5006 CONST PB_IDR 
+$5007 CONST PB_DDR  
+$5008 CONST PB_CR1 
+$5009 CONST PB_CR2 
+
+\ gpio port D    
+$500F CONST PD_ODR
+$5010 CONST PD_IDR
+$5011 CONST PD_DDR
+$5012 CONST PD_CR1
+$5013 CONST PD_CR2
+
+
+\ création d'un tableau
+\ de n élément  
+: ARRAY ( n -- )
+    VAR 
+    1- 2* ALLOT 
+; 
+
+\  dépose n dans 
+\ le nième élément
+\ du tableau 'a'  
+: A! ( n  a -- ) 
+    swap 2* + !
+;
+
+\ empile le nième 
+\ élément du 
+\ tableau 'a 
+: A@ ( n1 a -- n2 )
+    swap 2* + @
+; 
+
+8 ARRAY TUNES  
+
+: [']
+    ' 
+; IMMEDIATE COMPILE-ONLY 
+
+
+: RING_TONES 
+    ['] ODE-JOIE LITERAL 0 TUNES A! 
+    ['] CODE-ET LITERAL 1 TUNES A! 
+    ['] BIG-BEN LITERAL 2 TUNES  A! 
+    ['] KORO LITERAL 3 TUNES A! 
+    ['] GONG LITERAL 4 TUNES A! 
+    ['] KONGAS LITERAL 5 TUNES A! 
+    ['] J-INTERD LITERAL 6 TUNES A! 
+    ['] TROMPETTE LITERAL 7 TUNES A! 
+; 
+
+
+
+: DOOR-BELL
+    RING_TONES \ build ring tones array 
+    CR ." DOOR-BELL AUTO-RUNNING" CR 
+    BEGIN 
+        BEGIN 
+            KEY? IF KEY ABORT THEN 
+            PB_IDR C@ 
+            2 AND 
+        0= UNTIL 
+        PA_IDR C@ 
+        2* $F8 XOR \ bits 3...7 inversés  
+        $F8 AND \ garde les bits 3...7  
+        PD_IDR C@ 7 XOR \ bits 0...2 inversés  
+        7 AND \ garde les bits 0...2   
+        OR \ fusionne 0...2 et 3...7 
+        -1 SWAP 
+        BEGIN \ quelle mélodie est sélectionnée 
+            DUP WHILE
+            2/ 
+            SWAP 1+ SWAP  
+        REPEAT
+        DROP  \ 0...7  
+        TUNES A@ EXECUTE  
+    AGAIN 
+; 
+
+
+
