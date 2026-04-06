@@ -61,7 +61,7 @@ Donc lorsque ces fichiers __HEX__ sont formattés correctement on utilise le scr
 ./send.sh nom_du_fichier
 ```
 
-La dernière étape est de configuré l'autorun pour que l'application démarre automatique lors de la mise sous tension du circuit. dans la console forth il suffit de faire:
+La dernière étape est de configurer l'autorun pour que l'application démarre automatique lors de la mise sous tension du circuit. dans la console forth il suffit de faire:
 ```
 AUTORUN DOOR-BELL
 ```
