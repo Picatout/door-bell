@@ -1,6 +1,6 @@
 # sonette de porte réalisée avec un STM8L151K6
 
-Ce projet utilise le convertisseur Numérique/Analogique du MCU __STM8L151K6__  pour jouer un fichier au format __WAV__ enregistré dans une mémoire FLASH Windond __W25Q80DV__.  L'application est entièrement écrite en forth et comprend les 4 fichiers suivants:
+Ce projet utilise le convertisseur Numérique/Analogique du MCU __STM8L151K6__  pour jouer un fichier au format __WAV__ enregistré dans une mémoire FLASH Windond __W25Q80DV__.  L'application est entièrement écrite en [smallForth](https://github.com/Picatout/smallForth) et comprend les 4 fichiers suivants:
 1.  [exist.f](forth/exist.f)
 1.  [w25q_prog.f](forth/w25q_prog.f)
 1.  [play_wav.f](forth/play_wav.f)
