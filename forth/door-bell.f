@@ -90,6 +90,7 @@ $5006 CONST PB_IDR
 $5007 CONST PB_DDR  
 $5008 CONST PB_CR1 
 $5009 CONST PB_CR2 
+3 CONST SHUTDOWN \ lm6841 shutdown
 
 \ gpio port D    
 $500F CONST PD_ODR
@@ -166,10 +167,25 @@ EXTIB I:
     0 EXTI_SR2 SETBIT \ rst intr flag
 I; 
 
+\ activation du LM4861 
+: AMP_ON
+    SHUTDOWN PB_ODR RSTBIT 
+; 
+
+\ LM4861 en basse consommation
+: AMP_OFF 
+    SHUTDOWN PB_ODR SETBIT 
+; 
+
 : DOOR-BELL
+\ configure PB3 pour contrôler 
+\ la broche (1) shutdown du lm4861
+    SHUTDOWN PB_CR1 SETBIT 
+    SHUTDOWN PB_DDR SETBIT 
+    AMP_OFF 
+\ config EXTIB sur PB1, bouton sonette 
     0 EXTI_CONF1 SETBIT \ active intr sur PB[0..3] 
     3 EXTI_CR1 SETBIT \ transition descendante sur PB1  
-\    1 EXTI_CR3 SETBIT 
     1 PB_CR1 SETBIT \ pullup sur PB1 
     1 PB_CR2 SETBIT \ active intr sur PB1
     RING_TONES \ build ring tones array 
@@ -186,7 +202,8 @@ I;
     TIM4_IER_UIE TIM4_IER RSTBIT \ désactive timer4 
     5 CLK_PCKENR1 RSTBIT \ désactive le UART  
     BEGIN 
-        HALT  
+        HALT 
+        AMP_ON  
         PA_IDR C@ 
         2* $F8 XOR \ bits 3...7 inversés  
         $F8 AND \ garde les bits 3...7  
@@ -200,7 +217,8 @@ I;
             SWAP 1+ SWAP  
         REPEAT
         DROP  \ 0...7  
-        TUNES A@ EXECUTE  
+        TUNES A@ EXECUTE
+        AMP_OFF   
     AGAIN 
 ; 
 
