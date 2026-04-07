@@ -91,6 +91,7 @@ $5007 CONST PB_DDR
 $5008 CONST PB_CR1 
 $5009 CONST PB_CR2 
 3 CONST SHUTDOWN \ lm6841 shutdown
+2 CONST LED \ play LED control 
 
 \ gpio port D    
 $500F CONST PD_ODR
@@ -176,6 +177,15 @@ I;
 : AMP_OFF 
     SHUTDOWN PB_ODR SETBIT 
 ; 
+\ PLAY DOOR-BELL WAV 
+\ n is TUNES index  
+: RING ( n -- )
+    LED PB_ODR RSTBIT 
+    AMP_ON 
+    TUNES A@ EXECUTE 
+    AMP_OFF 
+    LED PB_ODR SETBIT
+; 
 
 : DOOR-BELL
 \ configure PB3 pour contrôler 
@@ -183,27 +193,30 @@ I;
     SHUTDOWN PB_CR1 SETBIT 
     SHUTDOWN PB_DDR SETBIT 
     AMP_OFF 
+\ set LED pin as output 
+    LED PB_ODR SETBIT 
+    LED PB_DDR SETBIT     
 \ config EXTIB sur PB1, bouton sonette 
     0 EXTI_CONF1 SETBIT \ active intr sur PB[0..3] 
     3 EXTI_CR1 SETBIT \ transition descendante sur PB1  
     1 PB_CR1 SETBIT \ pullup sur PB1 
     1 PB_CR2 SETBIT \ active intr sur PB1
     RING_TONES \ build ring tones array 
-    CR ." DOOR-BELL RUNNING, KEY TO ABORT (5 SEC.)" CR 
+    CR ." DOOR-BELL RUNNING, KEY TO ABORT (4 SEC.)" CR 
     TMR-RST  
     BEGIN 
         KEY? IF 
                 KEY ABORT" aborted" 
             THEN 
-        TIMER 5000 > 
+        TIMER 4000 > 
     UNTIL 
     ." TOO LATE" 
     BEGIN USART1_SR C@ $40 AND  UNTIL \ test TC bit  
     TIM4_IER_UIE TIM4_IER RSTBIT \ désactive timer4 
     5 CLK_PCKENR1 RSTBIT \ désactive le UART  
+    5 RING 
     BEGIN 
         HALT 
-        AMP_ON  
         PA_IDR C@ 
         2* $F8 XOR \ bits 3...7 inversés  
         $F8 AND \ garde les bits 3...7  
@@ -217,8 +230,7 @@ I;
             SWAP 1+ SWAP  
         REPEAT
         DROP  \ 0...7  
-        TUNES A@ EXECUTE
-        AMP_OFF   
+        RING 
     AGAIN 
 ; 
 
