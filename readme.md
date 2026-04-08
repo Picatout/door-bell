@@ -68,4 +68,6 @@ AUTORUN DOOR-BELL
 Redémarrez le MCU en pesant sur le bouton __RESET__. Au démarrage l'application laisse à l'utilisateur 5 secondes pour annuler l'application. Presser n'importe quel touche au clavier annule l'exécution de __DOOR-BELL__ avec retour sur la ligne de commande du forth.
 
 
+## ATTENTION
 
+**Dans tous les scripts qui utilise l'utilitaire [SendFile](tools/SendFile) le nom du port sériel que vous utilisez doit remplacer celui indiqué par défaut dans le fichier script.**
