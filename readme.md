@@ -56,9 +56,9 @@ stm8flash -c stlinkv2 -p stm8l151k6 build/stm8l151k6/smallForth.bin
  ```
 Le fichier sera donc programmé à l'adresse __0x88000__ sur la __W25Q80DV__ et la taille du fichier est de __0x2EB50 octets.__ Notez les 4 derniers octets de la 2ième ligne __50 EB 02 00__  c'est encore la taille du fichier saisie au format *little indian*. 
 
-Donc lorsque ces fichiers __HEX__ sont formattés correctement on utilise le script [send.sh](send.sh) comme suit:
+Donc lorsque ces fichiers __HEX__ sont formattés correctement on utilise le script [prog_wav.sh](prog_wav.sh) comme suit:
 ```
-./send.sh nom_du_fichier
+./prog_wav.sh nom_du_fichier
 ```
 
 La dernière étape est de configurer l'autorun pour que l'application démarre automatique lors de la mise sous tension du circuit. dans la console forth il suffit de faire:
