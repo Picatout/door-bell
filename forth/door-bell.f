@@ -104,22 +104,10 @@ $5013 CONST PD_CR2
 \ création d'un tableau
 \ de n élément  
 : ARRAY ( n -- )
-    VAR 
-    1- 2* ALLOT 
-; 
-
-\  dépose n dans 
-\ le nième élément
-\ du tableau 'a'  
-: A! ( n  a -- ) 
-    swap 2* + !
-;
-
-\ empile le nième 
-\ élément du 
-\ tableau 'a 
-: A@ ( n1 a -- n2 )
-    swap 2* + @
+    CREATE 
+    2* ALLOT
+    DOES>
+    SWAP 2* +  
 ; 
 
 8 ARRAY TUNES  
@@ -130,20 +118,16 @@ $5013 CONST PD_CR2
 
 
 : RING_TONES 
-    ['] ODE-JOIE LITERAL 0 TUNES A! 
-    ['] CODE-ET LITERAL 1 TUNES A! 
-    ['] BIG-BEN LITERAL 2 TUNES  A! 
-    ['] KORO LITERAL 3 TUNES A! 
-    ['] GONG LITERAL 4 TUNES A! 
-    ['] KONGAS LITERAL 5 TUNES A! 
-    ['] J-INTERD LITERAL 6 TUNES A! 
-    ['] TROMPETTE LITERAL 7 TUNES A! 
+    ['] ODE-JOIE LITERAL 0 TUNES !
+    ['] CODE-ET LITERAL 1 TUNES ! 
+    ['] BIG-BEN LITERAL 2 TUNES  ! 
+    ['] KORO LITERAL 3 TUNES ! 
+    ['] GONG LITERAL 4 TUNES ! 
+    ['] KONGAS LITERAL 5 TUNES ! 
+    ['] J-INTERD LITERAL 6 TUNES ! 
+    ['] TROMPETTE LITERAL 7 TUNES ! 
 ; 
 
-
-: WFI 
-  [ $8F C, ]
-; 
 
 : HALT 
     [ $8E C, ]
@@ -179,10 +163,10 @@ I;
 ; 
 \ PLAY DOOR-BELL WAV 
 \ n is TUNES index  
-: RING ( n -- )
+: PLAY ( n -- )
     LED PB_ODR RSTBIT 
     AMP_ON 
-    TUNES A@ EXECUTE 
+    TUNES @EXECUTE 
     AMP_OFF 
     LED PB_ODR SETBIT
 ; 
@@ -214,7 +198,7 @@ I;
     BEGIN USART1_SR C@ $40 AND  UNTIL \ test TC bit  
     TIM4_IER_UIE TIM4_IER RSTBIT \ désactive timer4 
     5 CLK_PCKENR1 RSTBIT \ désactive le UART  
-    5 RING 
+    5 PLAY  
     BEGIN 
         HALT 
         PA_IDR C@ 
@@ -230,9 +214,10 @@ I;
             SWAP 1+ SWAP  
         REPEAT
         DROP  \ 0...7  
-        RING 
+        PLAY  
     AGAIN 
 ; 
+
 
 
 

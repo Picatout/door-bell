@@ -1,3 +1,12 @@
+# Notes de projet
+
+### 2026-04-08 
+
+* Modifié schématique du circuit pour ajouter la résistance **R12**  comme pullup sur la broche 1 du **LM4861**
+* Installé la version 1.1R7 de smnallForth 
+* Modifié [door-bell.f](forth$door-bell.f) pour mettre à profit le mot **DOES&gt;** qui est inclus dans smallForth 1.1R7.
+
+
 ### 2026-04-05 
 
 * Modification à [door-bell.f](forth$door-bell.f) pour réduire la consommation électrique lorsqu'en attente. Avec cette modificaton le circuit consomme 80µA lorsqu'en attente. Alimenté avec 2 piles C la duré de vie des piles devraît-être de 5 ans en théorie. Calcul basé sur une capacité 3800mAH ce qui est en déça de la capacité une pile C de bonne qualité.
