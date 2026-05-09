@@ -1,5 +1,9 @@
 # Notes de projet
 
+### 2026-05-09 
+
+* Modification du circuit pour ajouter la résistance de 1Ko en série avec le fil du bouton de la sonnette. Le fil agissant comme une antenne captait les impulsion RF ce qui avait pour effet de déclencher la sonnerie.
+ 
 ### 2026-04-08 
 
 * Modifié schématique du circuit pour ajouter la résistance **R12**  comme pullup sur la broche 1 du **LM4861**
